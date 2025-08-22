@@ -1,23 +1,22 @@
-// src/firebase.js
-import { initializeApp } from 'firebase/app';
-import { getDatabase } from 'firebase/database';
-import { getAuth } from 'firebase/auth';
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
 
-// Firebase Console'dan aldığınız config bilgileri
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyBXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX", // Kendi bilgilerinizi yazın
-  authDomain: "online-notes-app-xxxxx.firebaseapp.com",
-  databaseURL: "https://online-notes-app-xxxxx-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "online-notes-app-xxxxx",
-  storageBucket: "online-notes-app-xxxxx.appspot.com",
-  messagingSenderId: "123456789012",
-  appId: "1:123456789012:web:xxxxxxxxxxxxxxxx"
+  apiKey: "AIzaSyDR4lJpvF_hRGcwOyroTJpMWHCHMaaR7tU",
+  authDomain: "note-cb624.firebaseapp.com",
+  databaseURL: "https://note-cb624-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "note-cb624",
+  storageBucket: "note-cb624.firebasestorage.app",
+  messagingSenderId: "480694636092",
+  appId: "1:480694636092:web:4dea434e18ac142413fd39",
+  measurementId: "G-Q3VVVKMJY9"
 };
 
-// Firebase'i başlat
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
-
-// Database ve Auth referansları
-export const database = getDatabase(app);
-export const auth = getAuth(app);
-export default app;
+const analytics = getAnalytics(app);
