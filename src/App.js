@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 const App = () => {
   const [user, setUser] = useState(null);
@@ -135,7 +135,7 @@ const App = () => {
     setSelectedColor(cells[cellId]?.color || 'white');
   };
 
-  const saveCell = () => {
+  const saveCell = useCallback(() => {
     if (activeCell) {
       setCells(prev => ({
         ...prev,
@@ -148,9 +148,9 @@ const App = () => {
       setCellText('');
       setSelectedColor('white');
     }
-  };
+  }, [activeCell, cellText, selectedColor]);
 
-  const clearCell = () => {
+  const clearCell = useCallback(() => {
     if (activeCell) {
       setCells(prev => ({
         ...prev,
@@ -163,7 +163,7 @@ const App = () => {
       setCellText('');
       setSelectedColor('white');
     }
-  };
+  }, [activeCell]);
 
   const getColorClass = (color) => {
     switch (color) {
@@ -190,7 +190,7 @@ const App = () => {
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [activeCell, cellText, selectedColor]);
+  }, [activeCell, cellText, selectedColor, saveCell]);
 
   if (!user) {
     return (
