@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Users, LogOut, Save, Palette, Edit3 } from 'lucide-react';
 
-const OnlineNotesApp = () => {
+const App = () => {
   const [user, setUser] = useState(null);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -71,7 +70,9 @@ const OnlineNotesApp = () => {
         <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
           <div className="text-center mb-8">
             <div className="bg-indigo-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Edit3 className="w-8 h-8 text-indigo-600" />
+              <svg className="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
             </div>
             <h1 className="text-2xl font-bold text-gray-800">Online Notlar</h1>
             <p className="text-gray-600 mt-2">Arkadaşlarınızla not paylaşın</p>
@@ -140,14 +141,18 @@ const OnlineNotesApp = () => {
         <div className="flex items-center justify-between max-w-7xl mx-auto">
           <div className="flex items-center space-x-3">
             <div className="bg-indigo-100 w-10 h-10 rounded-full flex items-center justify-center">
-              <Edit3 className="w-5 h-5 text-indigo-600" />
+              <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
             </div>
             <h1 className="text-xl font-bold text-gray-800">Online Notlar</h1>
           </div>
           
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <Users className="w-4 h-4 text-gray-500" />
+              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+              </svg>
               <span className="text-sm text-gray-600">{onlineUsers.length} kişi online</span>
             </div>
             <div className="flex items-center space-x-2">
@@ -156,7 +161,9 @@ const OnlineNotesApp = () => {
                 onClick={() => setUser(null)}
                 className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
               >
-                <LogOut className="w-4 h-4" />
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
               </button>
             </div>
           </div>
@@ -280,7 +287,9 @@ const OnlineNotesApp = () => {
                 onClick={saveCell}
                 className="flex-1 bg-indigo-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-indigo-700 transition-colors flex items-center justify-center space-x-2"
               >
-                <Save className="w-4 h-4" />
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
                 <span>Kaydet</span>
               </button>
               <button
@@ -297,4 +306,4 @@ const OnlineNotesApp = () => {
   );
 };
 
-export default OnlineNotesApp;
+export default App;
