@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { database } from './firebase';
+import { ref, set, onValue, push, remove, serverTimestamp } from 'firebase/database';
 
 const App = () => {
   const [user, setUser] = useState(null);
@@ -9,84 +11,114 @@ const App = () => {
   const [activeCell, setActiveCell] = useState(null);
   const [cellText, setCellText] = useState('');
   const [selectedColor, setSelectedColor] = useState('white');
-  const [onlineUsers, setOnlineUsers] = useState(['Kullanıcı1', 'Kullanıcı2']);
+  const [onlineUsers, setOnlineUsers] = useState({});
   const [loginError, setLoginError] = useState('');
+  const [connectionStatus, setConnectionStatus] = useState('offline');
+  const [userPresenceRef, setUserPresenceRef] = useState(null);
 
-  // Initialize cells
-  useEffect(() => {
+  // Initialize cells structure
+  const initializeCells = useCallback(() => {
     const initialCells = {};
     // First row: 1-11
     for (let i = 1; i <= 11; i++) {
-      initialCells[i] = { text: '', color: 'white' };
+      initialCells[i] = { text: '', color: 'white', lastUpdatedBy: '', lastUpdated: null };
     }
     // Second row: 22-12 (reverse order)
     for (let i = 22; i >= 12; i--) {
-      initialCells[i] = { text: '', color: 'white' };
+      initialCells[i] = { text: '', color: 'white', lastUpdatedBy: '', lastUpdated: null };
     }
-    setCells(initialCells);
+    return initialCells;
   }, []);
 
-  // Load saved data from localStorage when component mounts
+  // Initialize app
   useEffect(() => {
-    const savedCells = localStorage.getItem('onlineNotesCells');
-    if (savedCells) {
-      setCells(JSON.parse(savedCells));
-    }
-    
+    // Check for saved user
     const savedUser = localStorage.getItem('onlineNotesUser');
     if (savedUser) {
       setUser(savedUser);
-      // Simulate adding user to online users
-      updateOnlineUsers(savedUser, 'join');
+    } else {
+      setCells(initializeCells());
     }
-  }, []);
+  }, [initializeCells]);
 
-  // Save cells to localStorage whenever cells change
+  // Firebase real-time listeners
   useEffect(() => {
-    if (Object.keys(cells).length > 0) {
-      localStorage.setItem('onlineNotesCells', JSON.stringify(cells));
-    }
-  }, [cells]);
+    if (user) {
+      setConnectionStatus('connecting');
 
-  // Simulate online users management
-  const updateOnlineUsers = (username, action) => {
-    setOnlineUsers(prev => {
-      if (action === 'join') {
-        // Add user if not already in the list
-        if (!prev.includes(username)) {
-          return [...prev, username];
+      // Listen to cells changes
+      const cellsRef = ref(database, 'cells');
+      const unsubscribeCells = onValue(cellsRef, (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+          setCells(data);
+        } else {
+          // Initialize cells in Firebase if empty
+          const initialCells = initializeCells();
+          set(cellsRef, initialCells);
+          setCells(initialCells);
         }
-        return prev;
-      } else if (action === 'leave') {
-        // Remove user from the list
-        return prev.filter(user => user !== username);
-      }
-      return prev;
-    });
-  };
+      });
 
-  const handleLogin = () => {
+      // Listen to online users
+      const onlineUsersRef = ref(database, 'onlineUsers');
+      const unsubscribeUsers = onValue(onlineUsersRef, (snapshot) => {
+        const data = snapshot.val() || {};
+        setOnlineUsers(data);
+      });
+
+      // Add current user to online users
+      const userRef = push(ref(database, 'onlineUsers'));
+      set(userRef, {
+        username: user,
+        timestamp: serverTimestamp()
+      });
+      setUserPresenceRef(userRef);
+
+      // Remove user when disconnected
+      const connectedRef = ref(database, '.info/connected');
+      onValue(connectedRef, (snapshot) => {
+        if (snapshot.val() === true) {
+          setConnectionStatus('online');
+          // Set up disconnect handler
+          import('firebase/database').then(({ onDisconnect }) => {
+            onDisconnect(userRef).remove();
+          });
+        } else {
+          setConnectionStatus('offline');
+        }
+      });
+
+      return () => {
+        unsubscribeCells();
+        unsubscribeUsers();
+        if (userPresenceRef) {
+          remove(userPresenceRef);
+        }
+      };
+    }
+  }, [user, initializeCells, userPresenceRef]);
+
+  const handleLogin = useCallback(() => {
     if (!username.trim() || !password.trim()) {
       setLoginError('Kullanıcı adı ve şifre gereklidir');
       return;
     }
 
-    // Simple validation (in real app, this would be server-side)
+    // Simple authentication (in production, use Firebase Auth)
     const savedUsers = JSON.parse(localStorage.getItem('registeredUsers') || '{}');
-    
     if (savedUsers[username] && savedUsers[username] === password) {
       setUser(username);
       localStorage.setItem('onlineNotesUser', username);
-      updateOnlineUsers(username, 'join');
       setLoginError('');
       setUsername('');
       setPassword('');
     } else {
       setLoginError('Geçersiz kullanıcı adı veya şifre');
     }
-  };
+  }, [username, password]);
 
-  const handleRegister = () => {
+  const handleRegister = useCallback(() => {
     if (!username.trim() || !password.trim()) {
       setLoginError('Kullanıcı adı ve şifre gereklidir');
       return;
@@ -102,9 +134,7 @@ const App = () => {
       return;
     }
 
-    // Save user to localStorage (in real app, this would be server-side)
     const savedUsers = JSON.parse(localStorage.getItem('registeredUsers') || '{}');
-    
     if (savedUsers[username]) {
       setLoginError('Bu kullanıcı adı zaten alınmış');
       return;
@@ -112,58 +142,65 @@ const App = () => {
 
     savedUsers[username] = password;
     localStorage.setItem('registeredUsers', JSON.stringify(savedUsers));
-    
     setUser(username);
     localStorage.setItem('onlineNotesUser', username);
-    updateOnlineUsers(username, 'join');
     setLoginError('');
     setUsername('');
     setPassword('');
-  };
+  }, [username, password]);
 
-  const handleLogout = () => {
-    if (user) {
-      updateOnlineUsers(user, 'leave');
-      localStorage.removeItem('onlineNotesUser');
+  const handleLogout = useCallback(() => {
+    if (userPresenceRef) {
+      remove(userPresenceRef);
     }
+    localStorage.removeItem('onlineNotesUser');
     setUser(null);
-  };
+    setOnlineUsers({});
+    setConnectionStatus('offline');
+  }, [userPresenceRef]);
 
-  const handleCellClick = (cellId) => {
+  const handleCellClick = useCallback((cellId) => {
     setActiveCell(cellId);
     setCellText(cells[cellId]?.text || '');
     setSelectedColor(cells[cellId]?.color || 'white');
-  };
+  }, [cells]);
 
   const saveCell = useCallback(() => {
-    if (activeCell) {
-      setCells(prev => ({
-        ...prev,
-        [activeCell]: {
-          text: cellText,
-          color: selectedColor
-        }
-      }));
+    if (activeCell && user) {
+      const updatedCell = {
+        text: cellText,
+        color: selectedColor,
+        lastUpdatedBy: user,
+        lastUpdated: serverTimestamp()
+      };
+
+      // Save to Firebase
+      const cellRef = ref(database, `cells/${activeCell}`);
+      set(cellRef, updatedCell);
+
       setActiveCell(null);
       setCellText('');
       setSelectedColor('white');
     }
-  }, [activeCell, cellText, selectedColor]);
+  }, [activeCell, cellText, selectedColor, user]);
 
   const clearCell = useCallback(() => {
-    if (activeCell) {
-      setCells(prev => ({
-        ...prev,
-        [activeCell]: {
-          text: '',
-          color: 'white'
-        }
-      }));
+    if (activeCell && user) {
+      const clearedCell = {
+        text: '',
+        color: 'white',
+        lastUpdatedBy: user,
+        lastUpdated: serverTimestamp()
+      };
+
+      const cellRef = ref(database, `cells/${activeCell}`);
+      set(cellRef, clearedCell);
+
       setActiveCell(null);
       setCellText('');
       setSelectedColor('white');
     }
-  }, [activeCell]);
+  }, [activeCell, user]);
 
   const getColorClass = (color) => {
     switch (color) {
@@ -190,7 +227,11 @@ const App = () => {
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [activeCell, cellText, selectedColor, saveCell]);
+  }, [activeCell, saveCell]);
+
+  // Get online users list
+  const onlineUsersList = Object.values(onlineUsers).map(user => user.username);
+  const uniqueOnlineUsers = [...new Set(onlineUsersList)];
 
   if (!user) {
     return (
@@ -203,7 +244,8 @@ const App = () => {
               </svg>
             </div>
             <h1 className="text-2xl font-bold text-gray-800">Online Notlar</h1>
-            <p className="text-gray-600 mt-2">Arkadaşlarınızla not paylaşın</p>
+            <p className="text-gray-600 mt-2">Arkadaşlarınızla gerçek zamanlı not paylaşın</p>
+            <p className="text-sm text-green-600 mt-2">🔥 Firebase ile gerçek zamanlı senkronizasyon</p>
           </div>
 
           <div className="flex mb-6 bg-gray-100 rounded-lg p-1">
@@ -280,11 +322,9 @@ const App = () => {
             </button>
           </div>
 
-          {isLogin && (
-            <div className="mt-4 text-center text-sm text-gray-600">
-              <p>Demo için herhangi bir kullanıcı adı ve şifre ile kayıt olabilirsiniz.</p>
-            </div>
-          )}
+          <div className="mt-4 text-center text-sm text-gray-600">
+            <p>Demo için herhangi bir kullanıcı adı ve şifre ile kayıt olabilirsiniz.</p>
+          </div>
         </div>
       </div>
     );
@@ -302,6 +342,15 @@ const App = () => {
               </svg>
             </div>
             <h1 className="text-xl font-bold text-gray-800">Online Notlar</h1>
+            <div className={`px-2 py-1 text-xs rounded-full ${
+              connectionStatus === 'online' ? 'bg-green-100 text-green-800' :
+              connectionStatus === 'connecting' ? 'bg-yellow-100 text-yellow-800' :
+              'bg-red-100 text-red-800'
+            }`}>
+              {connectionStatus === 'online' ? '🟢 Çevrimiçi' :
+               connectionStatus === 'connecting' ? '🟡 Bağlanıyor...' :
+               '🔴 Çevrimdışı'}
+            </div>
           </div>
           
           <div className="flex items-center space-x-4">
@@ -309,7 +358,7 @@ const App = () => {
               <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
               </svg>
-              <span className="text-sm text-gray-600">{onlineUsers.length} kişi online</span>
+              <span className="text-sm text-gray-600">{uniqueOnlineUsers.length} kişi online</span>
             </div>
             <div className="flex items-center space-x-2">
               <span className="text-sm text-gray-600">Merhaba, {user}</span>
@@ -353,11 +402,19 @@ const App = () => {
                       ${getColorClass(cells[cellId]?.color)}
                       ${activeCell === cellId ? 'ring-2 ring-indigo-500' : ''}
                     `}
+                    title={cells[cellId]?.lastUpdatedBy ? 
+                      `Son güncelleme: ${cells[cellId].lastUpdatedBy}` : 
+                      'Henüz güncellenmedi'}
                   >
                     <span className="text-xs font-medium text-gray-500 mb-1">{cellId}</span>
                     <div className="text-sm text-center text-gray-700 break-words overflow-hidden">
                       {cells[cellId]?.text || ''}
                     </div>
+                    {cells[cellId]?.lastUpdatedBy && (
+                      <div className="text-xs text-gray-400 mt-1 truncate">
+                        @{cells[cellId].lastUpdatedBy}
+                      </div>
+                    )}
                   </div>
                 ))}
                 
@@ -372,11 +429,19 @@ const App = () => {
                       ${getColorClass(cells[cellId]?.color)}
                       ${activeCell === cellId ? 'ring-2 ring-indigo-500' : ''}
                     `}
+                    title={cells[cellId]?.lastUpdatedBy ? 
+                      `Son güncelleme: ${cells[cellId].lastUpdatedBy}` : 
+                      'Henüz güncellenmedi'}
                   >
                     <span className="text-xs font-medium text-gray-500 mb-1">{cellId}</span>
                     <div className="text-sm text-center text-gray-700 break-words overflow-hidden">
                       {cells[cellId]?.text || ''}
                     </div>
+                    {cells[cellId]?.lastUpdatedBy && (
+                      <div className="text-xs text-gray-400 mt-1 truncate">
+                        @{cells[cellId].lastUpdatedBy}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -386,9 +451,12 @@ const App = () => {
 
         {/* Online Users */}
         <div className="mt-6 bg-white rounded-xl shadow-lg p-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-3">Online Kullanıcılar</h3>
+          <h3 className="text-lg font-semibold text-gray-800 mb-3">
+            Online Kullanıcılar 
+            <span className="text-sm text-green-600 ml-2">🔥 Gerçek Zamanlı</span>
+          </h3>
           <div className="flex flex-wrap gap-2">
-            {onlineUsers.map((userName, index) => (
+            {uniqueOnlineUsers.map((userName, index) => (
               <div 
                 key={index} 
                 className={`px-3 py-1 rounded-full text-sm mb-2 ${
@@ -400,6 +468,9 @@ const App = () => {
                 {userName} {userName === user && '(Sen)'}
               </div>
             ))}
+            {uniqueOnlineUsers.length === 0 && (
+              <div className="text-gray-500 text-sm">Henüz kimse online değil</div>
+            )}
           </div>
         </div>
       </div>
