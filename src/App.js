@@ -10,6 +10,7 @@ const App = () => {
   const [cellText, setCellText] = useState('');
   const [selectedColor, setSelectedColor] = useState('white');
   const [onlineUsers, setOnlineUsers] = useState(['Kullanıcı1', 'Kullanıcı2']);
+  const [loginError, setLoginError] = useState('');
 
   // Initialize cells
   useEffect(() => {
@@ -25,16 +26,107 @@ const App = () => {
     setCells(initialCells);
   }, []);
 
+  // Load saved data from localStorage when component mounts
+  useEffect(() => {
+    const savedCells = localStorage.getItem('onlineNotesCells');
+    if (savedCells) {
+      setCells(JSON.parse(savedCells));
+    }
+    
+    const savedUser = localStorage.getItem('onlineNotesUser');
+    if (savedUser) {
+      setUser(savedUser);
+      // Simulate adding user to online users
+      updateOnlineUsers(savedUser, 'join');
+    }
+  }, []);
+
+  // Save cells to localStorage whenever cells change
+  useEffect(() => {
+    if (Object.keys(cells).length > 0) {
+      localStorage.setItem('onlineNotesCells', JSON.stringify(cells));
+    }
+  }, [cells]);
+
+  // Simulate online users management
+  const updateOnlineUsers = (username, action) => {
+    setOnlineUsers(prev => {
+      if (action === 'join') {
+        // Add user if not already in the list
+        if (!prev.includes(username)) {
+          return [...prev, username];
+        }
+        return prev;
+      } else if (action === 'leave') {
+        // Remove user from the list
+        return prev.filter(user => user !== username);
+      }
+      return prev;
+    });
+  };
+
   const handleLogin = () => {
-    if (username && password) {
+    if (!username.trim() || !password.trim()) {
+      setLoginError('Kullanıcı adı ve şifre gereklidir');
+      return;
+    }
+
+    // Simple validation (in real app, this would be server-side)
+    const savedUsers = JSON.parse(localStorage.getItem('registeredUsers') || '{}');
+    
+    if (savedUsers[username] && savedUsers[username] === password) {
       setUser(username);
+      localStorage.setItem('onlineNotesUser', username);
+      updateOnlineUsers(username, 'join');
+      setLoginError('');
+      setUsername('');
+      setPassword('');
+    } else {
+      setLoginError('Geçersiz kullanıcı adı veya şifre');
     }
   };
 
   const handleRegister = () => {
-    if (username && password) {
-      setUser(username);
+    if (!username.trim() || !password.trim()) {
+      setLoginError('Kullanıcı adı ve şifre gereklidir');
+      return;
     }
+
+    if (username.length < 3) {
+      setLoginError('Kullanıcı adı en az 3 karakter olmalıdır');
+      return;
+    }
+
+    if (password.length < 4) {
+      setLoginError('Şifre en az 4 karakter olmalıdır');
+      return;
+    }
+
+    // Save user to localStorage (in real app, this would be server-side)
+    const savedUsers = JSON.parse(localStorage.getItem('registeredUsers') || '{}');
+    
+    if (savedUsers[username]) {
+      setLoginError('Bu kullanıcı adı zaten alınmış');
+      return;
+    }
+
+    savedUsers[username] = password;
+    localStorage.setItem('registeredUsers', JSON.stringify(savedUsers));
+    
+    setUser(username);
+    localStorage.setItem('onlineNotesUser', username);
+    updateOnlineUsers(username, 'join');
+    setLoginError('');
+    setUsername('');
+    setPassword('');
+  };
+
+  const handleLogout = () => {
+    if (user) {
+      updateOnlineUsers(user, 'leave');
+      localStorage.removeItem('onlineNotesUser');
+    }
+    setUser(null);
   };
 
   const handleCellClick = (cellId) => {
@@ -44,15 +136,33 @@ const App = () => {
   };
 
   const saveCell = () => {
-    setCells(prev => ({
-      ...prev,
-      [activeCell]: {
-        text: cellText,
-        color: selectedColor
-      }
-    }));
-    setActiveCell(null);
-    setCellText('');
+    if (activeCell) {
+      setCells(prev => ({
+        ...prev,
+        [activeCell]: {
+          text: cellText,
+          color: selectedColor
+        }
+      }));
+      setActiveCell(null);
+      setCellText('');
+      setSelectedColor('white');
+    }
+  };
+
+  const clearCell = () => {
+    if (activeCell) {
+      setCells(prev => ({
+        ...prev,
+        [activeCell]: {
+          text: '',
+          color: 'white'
+        }
+      }));
+      setActiveCell(null);
+      setCellText('');
+      setSelectedColor('white');
+    }
   };
 
   const getColorClass = (color) => {
@@ -60,9 +170,27 @@ const App = () => {
       case 'green': return 'bg-green-200 border-green-300';
       case 'orange': return 'bg-orange-200 border-orange-300';
       case 'red': return 'bg-red-200 border-red-300';
+      case 'blue': return 'bg-blue-200 border-blue-300';
+      case 'yellow': return 'bg-yellow-200 border-yellow-300';
       default: return 'bg-white border-gray-300';
     }
   };
+
+  // Handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (e) => {
+      if (e.key === 'Escape' && activeCell) {
+        setActiveCell(null);
+        setCellText('');
+      }
+      if (e.key === 'Enter' && e.ctrlKey && activeCell) {
+        saveCell();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [activeCell, cellText, selectedColor]);
 
   if (!user) {
     return (
@@ -80,7 +208,10 @@ const App = () => {
 
           <div className="flex mb-6 bg-gray-100 rounded-lg p-1">
             <button
-              onClick={() => setIsLogin(true)}
+              onClick={() => {
+                setIsLogin(true);
+                setLoginError('');
+              }}
               className={`flex-1 py-2 px-4 rounded-md font-medium transition-all ${
                 isLogin 
                   ? 'bg-white text-indigo-600 shadow-sm' 
@@ -90,7 +221,10 @@ const App = () => {
               Giriş Yap
             </button>
             <button
-              onClick={() => setIsLogin(false)}
+              onClick={() => {
+                setIsLogin(false);
+                setLoginError('');
+              }}
               className={`flex-1 py-2 px-4 rounded-md font-medium transition-all ${
                 !isLogin 
                   ? 'bg-white text-indigo-600 shadow-sm' 
@@ -101,6 +235,12 @@ const App = () => {
             </button>
           </div>
 
+          {loginError && (
+            <div className="mb-4 p-3 bg-red-100 border border-red-300 rounded-lg">
+              <p className="text-red-700 text-sm">{loginError}</p>
+            </div>
+          )}
+
           <div className="space-y-4">
             <div>
               <input
@@ -110,6 +250,11 @@ const App = () => {
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                 required
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    isLogin ? handleLogin() : handleRegister();
+                  }
+                }}
               />
             </div>
             <div>
@@ -120,6 +265,11 @@ const App = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                 required
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    isLogin ? handleLogin() : handleRegister();
+                  }
+                }}
               />
             </div>
             <button
@@ -129,6 +279,12 @@ const App = () => {
               {isLogin ? 'Giriş Yap' : 'Kayıt Ol'}
             </button>
           </div>
+
+          {isLogin && (
+            <div className="mt-4 text-center text-sm text-gray-600">
+              <p>Demo için herhangi bir kullanıcı adı ve şifre ile kayıt olabilirsiniz.</p>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -158,8 +314,9 @@ const App = () => {
             <div className="flex items-center space-x-2">
               <span className="text-sm text-gray-600">Merhaba, {user}</span>
               <button
-                onClick={() => setUser(null)}
+                onClick={handleLogout}
                 className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                title="Çıkış Yap"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -174,7 +331,13 @@ const App = () => {
         {/* Table */}
         <div className="bg-white rounded-xl shadow-lg overflow-hidden">
           <div className="p-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">Not Tablosu</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-800">Not Tablosu</h2>
+              <div className="text-sm text-gray-500">
+                <span className="bg-gray-100 px-2 py-1 rounded">ESC: İptal</span>
+                <span className="bg-gray-100 px-2 py-1 rounded ml-2">Ctrl+Enter: Kaydet</span>
+              </div>
+            </div>
             
             {/* Grid Container */}
             <div className="overflow-x-auto">
@@ -224,10 +387,17 @@ const App = () => {
         {/* Online Users */}
         <div className="mt-6 bg-white rounded-xl shadow-lg p-6">
           <h3 className="text-lg font-semibold text-gray-800 mb-3">Online Kullanıcılar</h3>
-          <div className="flex flex-wrap space-x-2">
+          <div className="flex flex-wrap gap-2">
             {onlineUsers.map((userName, index) => (
-              <div key={index} className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm mb-2">
-                {userName}
+              <div 
+                key={index} 
+                className={`px-3 py-1 rounded-full text-sm mb-2 ${
+                  userName === user 
+                    ? 'bg-indigo-100 text-indigo-800' 
+                    : 'bg-green-100 text-green-800'
+                }`}
+              >
+                {userName} {userName === user && '(Sen)'}
               </div>
             ))}
           </div>
@@ -253,6 +423,7 @@ const App = () => {
                   placeholder="Notunuzu yazın..."
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
                   rows="4"
+                  autoFocus
                 />
               </div>
               
@@ -260,18 +431,20 @@ const App = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Renk:
                 </label>
-                <div className="flex space-x-2">
+                <div className="flex flex-wrap gap-2">
                   {[
                     { value: 'white', label: 'Beyaz', class: 'bg-white border-gray-400' },
                     { value: 'green', label: 'Yeşil', class: 'bg-green-200 border-green-400' },
                     { value: 'orange', label: 'Turuncu', class: 'bg-orange-200 border-orange-400' },
                     { value: 'red', label: 'Kırmızı', class: 'bg-red-200 border-red-400' },
+                    { value: 'blue', label: 'Mavi', class: 'bg-blue-200 border-blue-400' },
+                    { value: 'yellow', label: 'Sarı', class: 'bg-yellow-200 border-yellow-400' },
                   ].map((color) => (
                     <button
                       key={color.value}
                       onClick={() => setSelectedColor(color.value)}
                       className={`
-                        w-12 h-12 border-2 rounded-lg transition-all
+                        w-10 h-10 border-2 rounded-lg transition-all
                         ${color.class}
                         ${selectedColor === color.value ? 'ring-2 ring-indigo-500 scale-110' : 'hover:scale-105'}
                       `}
@@ -291,6 +464,12 @@ const App = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
                 <span>Kaydet</span>
+              </button>
+              <button
+                onClick={clearCell}
+                className="flex-1 bg-red-500 text-white py-3 px-4 rounded-lg font-medium hover:bg-red-600 transition-colors"
+              >
+                Temizle
               </button>
               <button
                 onClick={() => setActiveCell(null)}
