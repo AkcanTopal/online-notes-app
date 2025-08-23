@@ -15,6 +15,30 @@ const App = () => {
   const [loginError, setLoginError] = useState('');
   const [connectionStatus, setConnectionStatus] = useState('offline');
   const [userPresenceRef, setUserPresenceRef] = useState(null);
+  const [isInstallable, setIsInstallable] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState(null);
+
+  // PWA Install Handler
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+      setIsInstallable(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
+
+  const handleInstallPWA = async () => {
+    if (!installPrompt) return;
+    
+    const result = await installPrompt.prompt();
+    console.log('Install result:', result.outcome);
+    
+    setInstallPrompt(null);
+    setIsInstallable(false);
+  };
 
   // Initialize cells structure
   const initializeCells = useCallback(() => {
@@ -243,9 +267,22 @@ const App = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
               </svg>
             </div>
-            <h1 className="text-2xl font-bold text-gray-800">Online Notlar</h1>
+            <h1 className="text-2xl font-bold text-gray-800">📱 Online Notlar PWA</h1>
             <p className="text-gray-600 mt-2">Arkadaşlarınızla gerçek zamanlı not paylaşın</p>
-            <p className="text-sm text-green-600 mt-2">🔥 Firebase ile gerçek zamanlı senkronizasyon</p>
+            <p className="text-sm text-green-600 mt-2">🔥 Firebase + PWA ile anlık senkron</p>
+            
+            {/* PWA Install Button */}
+            {isInstallable && (
+              <button
+                onClick={handleInstallPWA}
+                className="mt-3 bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors flex items-center justify-center mx-auto space-x-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+                <span>📱 Telefona Yükle</span>
+              </button>
+            )}
           </div>
 
           <div className="flex mb-6 bg-gray-100 rounded-lg p-1">
@@ -341,7 +378,7 @@ const App = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
               </svg>
             </div>
-            <h1 className="text-xl font-bold text-gray-800">Online Notlar</h1>
+            <h1 className="text-xl font-bold text-gray-800">📱 Online Notlar PWA</h1>
             <div className={`px-2 py-1 text-xs rounded-full ${
               connectionStatus === 'online' ? 'bg-green-100 text-green-800' :
               connectionStatus === 'connecting' ? 'bg-yellow-100 text-yellow-800' :
